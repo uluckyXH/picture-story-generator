@@ -497,7 +497,7 @@ def main():
     
     # 图片生成API配置
     image_api_key = ""  # 图片生成API密钥
-    image_base_url = "https://api.holdai.top/v1"  # 图片生成API基础URL
+    image_base_url = "https://api.openai.com"  # 图片生成API基础URL
     image_model = "dall-e-3"  # 图片生成模型
     image_size = "1024x1024"  # 图片尺寸
     image_model_type = "openai"  # 图片生成模型类型
