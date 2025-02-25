@@ -490,13 +490,13 @@ def generate_exercises(exercises_data: Union[List, Dict]) -> Tuple[str, Optional
 def main():
     """主函数"""
     # 配置参数
-    api_key = "sk-yjlkrfvbhppuexhjzotcqxqnqsmawjxjrqohkjytazozqfxg"  # 模型API密钥
+    api_key = ""  # 模型API密钥
     base_url = "https://api.siliconflow.cn/v1"  # 模型API基础URL
     model_name = "deepseek-ai/DeepSeek-V3"  # 模型名称
     model_type = "openai"  # 模型类型
     
     # 图片生成API配置
-    image_api_key = "sk-rfTtk7dyVgxbqRSh23F48809AaD2443882Df481a4dDb67B7"  # 图片生成API密钥
+    image_api_key = ""  # 图片生成API密钥
     image_base_url = "https://api.holdai.top/v1"  # 图片生成API基础URL
     image_model = "dall-e-3"  # 图片生成模型
     image_size = "1024x1024"  # 图片尺寸
