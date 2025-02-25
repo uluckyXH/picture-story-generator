@@ -289,8 +289,7 @@ def process_exercises_with_images(
 2、首先按结构生成{picture_count}个看图写话练习题
 2、在看图写话练习题对象中的题目数组增加字段，prompt提示词字段
 3、提示词为图片的描述，要符合场景，要描述详细，细节都要描述出来，包括细节、场景、动作，等等，图片提示词风格为卡通风格
-4、问题要根据提示词的描述来进行提问
-5、注意提示词一定要描述详细，细节要描述清楚，不要描述的太简单"""
+4、问题要根据提示词的描述来进行提问"""
     
     # 用户提示词
     user_prompt = f"题目要求：{user_requirements}"
@@ -498,15 +497,15 @@ def main():
     
     # 图片生成API配置
     image_api_key = ""  # 图片生成API密钥
-    image_base_url = "https://api.openai.com"  # 图片生成API基础URL
+    image_base_url = "https://api.openai.com/v1"  # 图片生成API基础URL
     image_model = "dall-e-3"  # 图片生成模型
     image_size = "1024x1024"  # 图片尺寸
     image_model_type = "openai"  # 图片生成模型类型
     image_delay = 2.0  # 图片生成请求之间的延迟时间（秒）
     
     # 题目生成参数
-    imitation_count = 5  # 句子仿写题数量
-    picture_count = 5  # 看图写话题数量
+    imitation_count = 2  # 句子仿写题数量
+    picture_count = 2  # 看图写话题数量
     user_requirements = "无其它要求"  # 用户要求
     
     # 调用处理流程
