@@ -7,6 +7,9 @@ Word文档生成器：负责将题目内容转换为Word文档
 
 import os
 import logging
+import requests
+import tempfile
+from io import BytesIO
 from typing import Dict, Any, List, Union
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -61,7 +64,7 @@ class WordGenerator:
         self._setup_document_styles(doc)
         
         # 添加文档标题
-        self._add_title(doc, "小学二年级语文练习题")
+        self._add_title(doc, "小学二年级仿写练习题与看图写话练习题")
         
         # 收集所有参考答案，按大题分组
         answers = []
@@ -175,6 +178,27 @@ class WordGenerator:
         """添加题目要求"""
         paragraph = doc.add_paragraph(requirement, style='Requirement')
     
+    def _download_image(self, url):
+        """
+        从URL下载图片
+        
+        Args:
+            url: 图片URL
+            
+        Returns:
+            图片的二进制数据
+        """
+        try:
+            response = requests.get(url, timeout=30)
+            if response.status_code == 200:
+                return BytesIO(response.content)
+            else:
+                logger.error(f"下载图片失败，状态码: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"下载图片时发生错误: {str(e)}")
+            return None
+    
     def _add_imitation_questions(self, doc, questions, answers_collector):
         """添加句子仿写题"""
         for question in questions:
@@ -216,13 +240,45 @@ class WordGenerator:
             q_text = f"{question['number']}. {question['question']}"
             paragraph = doc.add_paragraph(q_text, style='Question')
             
-            # 添加图片描述（提示词）
-            if "prompt" in question:
-                p = doc.add_paragraph(style='Normal')
-                p.paragraph_format.left_indent = Inches(0.5)
-                p.paragraph_format.right_indent = Inches(0.5)
-                p.paragraph_format.first_line_indent = Inches(0.25)
-                p.add_run(f"图片描述：{question['prompt']}").italic = True
+            # 添加图片 - 优先使用本地图片路径，如果没有则尝试从URL下载
+            image_added = False
+            
+            # 如果有本地图片路径，直接使用本地图片
+            if "local_image_path" in question and question["local_image_path"]:
+                try:
+                    local_path = question["local_image_path"]
+                    if os.path.exists(local_path):
+                        # 添加图片到文档
+                        p = doc.add_paragraph()
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = p.add_run()
+                        run.add_picture(local_path, width=Inches(5))
+                        logger.info(f"成功从本地添加图片到题目 {question['number']}")
+                        image_added = True
+                    else:
+                        logger.warning(f"本地图片文件不存在: {local_path}")
+                except Exception as e:
+                    logger.error(f"添加本地图片时发生错误: {str(e)}")
+            
+            # 如果没有成功添加本地图片，尝试从URL下载
+            if not image_added and "image_url" in question and question["image_url"]:
+                try:
+                    # 下载图片
+                    image_data = self._download_image(question["image_url"])
+                    if image_data:
+                        # 添加图片到文档
+                        p = doc.add_paragraph()
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = p.add_run()
+                        run.add_picture(image_data, width=Inches(5))
+                        logger.info(f"成功从URL添加图片到题目 {question['number']}")
+                        image_added = True
+                    else:
+                        logger.warning(f"无法下载图片，题目 {question['number']}")
+                except Exception as e:
+                    logger.error(f"添加URL图片时发生错误: {str(e)}")
+            
+            # 不再在图片下方显示图片描述，而是将其添加到参考答案中
             
             # 添加写作空间
             p = doc.add_paragraph(style='Normal')
@@ -236,13 +292,19 @@ class WordGenerator:
                 if i == 7:
                     doc.add_paragraph("。", style='Normal')
             
-            # 收集参考答案
+            # 收集参考答案和图片描述
             if "reference_answer" in question:
-                answers_collector["answers"].append({
+                answer_data = {
                     "number": question["number"],
                     "question": question["question"],
                     "answer": question["reference_answer"]
-                })
+                }
+                
+                # 如果有图片描述，添加到参考答案中
+                if "prompt" in question:
+                    answer_data["prompt"] = question["prompt"]
+                
+                answers_collector["answers"].append(answer_data)
             
             # 添加空行
             doc.add_paragraph()
@@ -263,6 +325,12 @@ class WordGenerator:
                 q_text = f"{answer_item['number']}. {answer_item['question']}"
                 paragraph = doc.add_paragraph(q_text, style='Question')
                 
+                # 如果是看图写话题目且有图片描述，先添加图片描述
+                if answer_group['title'] == "看图写话练习题" and "prompt" in answer_item:
+                    p = doc.add_paragraph(style='Answer')
+                    run = p.add_run(f"图片描述：{answer_item['prompt']}")
+                    run.italic = True
+                
                 # 添加参考答案
                 p = doc.add_paragraph(style='Answer')
                 run = p.add_run(f"参考答案：{answer_item['answer']}")
@@ -276,31 +344,47 @@ def main():
     """测试函数"""
     # 简单的测试数据
     test_content = [
-        {
-            "maxTitle": "句子仿写练习题",
-            "require": "请根据例句仿写句子。",
-            "questions": [
-                {
-                    "number": 1,
-                    "question": "例句：小鸟在树上唱歌。",
-                    "reference_answer": "小鱼在水里游来游去。",
-                    "Imitate_writing": ["小鱼", "在", "里"]
-                }
-            ]
-        },
-        {
-            "maxTitle": "看图写话练习题",
-            "require": "请根据图片提示写一段话。",
-            "questions": [
-                {
-                    "number": 1,
-                    "question": "图片里有哪些动物？它们在做什么？",
-                    "prompt": "图片中有一只大熊猫和一只小熊猫在竹林里玩耍。大熊猫正在吃竹子，小熊猫则好奇地四处张望。竹林里还有几只小鸟在树枝上唱歌。",
-                    "reference_answer": "图片中有一只大熊猫和一只小熊猫在竹林里玩耍。大熊猫正在吃竹子，小熊猫则好奇地四处张望。竹林里还有几只小鸟在树枝上唱歌。"
-                }
-            ]
-        }
-    ]
+            {
+                "maxTitle": "句子仿写练习题",
+                "require": "请根据例句进行仿写。",
+                "questions": [
+                    {
+                        "number": 1,
+                        "question": "例句：小鸟在树上唱歌。",
+                        "reference_answer": "小鸭在河里游泳。",
+                        "Imitate_writing": [
+                            "小鸭在",
+                            "",
+                            "里",
+                            ""
+                        ]
+                    },
+                    {
+                        "number": 2,
+                        "question": "例句：小狗在院子里玩耍。",
+                        "reference_answer": "小猫在窗台上晒太阳。",
+                        "Imitate_writing": [
+                            "小猫在",
+                            "",
+                            "上",
+                            ""
+                        ]
+                    }
+                ]
+            },
+            {
+                "maxTitle": "看图写话练习题",
+                "require": "请根据图片描述进行写话。",
+                "questions": [
+                    {
+                        "number": 1,
+                        "question": "请描述图片中的场景。",
+                        "prompt": "图片中是一个阳光明媚的公园，草地上有许多小朋友在玩耍。一个小男孩正在放风筝，风筝在天空中高高飘扬。一个小女孩在草地上追逐着一只小狗，小狗的尾巴摇得很快。远处有一棵大树，树下有一位老爷爷正在看报纸。天空中飘着几朵白云，整个场景充满了欢乐和宁静。",
+                        "reference_answer": "图片中是一个阳光明媚的公园，草地上有许多小朋友在玩耍。一个小男孩正在放风筝，风筝在天空中高高飘扬。一个小女孩在草地上追逐着一只小狗，小狗的尾巴摇得很快。远处有一棵大树，树下有一位老爷爷正在看报纸。天空中飘着几朵白云，整个场景充满了欢乐和宁静。"
+                    }
+                ]
+            }
+        ]
     
     # 创建Word文档
     generator = WordGenerator()
